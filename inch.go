@@ -644,6 +644,7 @@ func (s *Simulator) runClient(ctx context.Context, ch <-chan []byte) {
 
 // setup pulls the build and version from the server and initializes the database.
 var defaultSetupFn = func(s *Simulator) error {
+	fmt.Fprintf(s.Stdout, "setup... \n")
 	// Validate that we can connect to the test host
 	resp, err := http.Get(strings.TrimSuffix(s.Host, "/") + "/ping")
 	if err != nil {
@@ -661,12 +662,14 @@ var defaultSetupFn = func(s *Simulator) error {
 		s.ReportTags["version"] = version
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/query", s.Host), strings.NewReader("q=CREATE+DATABASE+"+s.Database+"+WITH+DURATION+"+s.ShardDuration))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/create", s.Host), nil)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	params := req.URL.Query()
+	params.Set("db", s.Database)
+	req.URL.RawQuery = params.Encode()
 
 	if s.User != "" && s.Password != "" {
 		req.SetBasicAuth(s.User, s.Password)
@@ -730,7 +733,7 @@ func (s *Simulator) sendBatch(buf []byte) error {
 	}
 
 	// Return body as error if unsuccessful.
-	if code != 204 {
+	if code != 204 && code != 200 {
 		s.mu.Lock()
 		s.currentErrors++
 		s.totalErrors++
